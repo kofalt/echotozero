@@ -8,14 +8,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+      # Install source code, golang, just
       - uses: actions/checkout@v3
-
       - uses: actions/setup-go@v3
         with:
           go-version-file: 'go.mod'
+      - uses: extractions/setup-just@v3
 
-      - run: go mod download
+      # Install with cache
+      - name: Cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go
+          key: deps-${{ runner.os }}-${{ hashFiles('.github/workflows/*', 'go.mod', 'go.sum', 'justfile') }}
+      - name: Install
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: just _precache
 
-      - run: go build -v
+      # Check
+      - run: just _ci
+      - run: go build -v -o democ ./demo
 
-      - run: go test -count 1 ./...
+      # Report
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v5
+        if: success() || failure()
+        with:
+          report_paths: 'report.xml'
